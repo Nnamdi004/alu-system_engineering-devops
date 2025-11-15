@@ -1,5 +1,8 @@
-Host myserver
-    HostName 98.98.98.98
-    User ubuntu
+# SSH client configuration must be configured to use the private key `~/.ssh/school`
+# SSH client configuration must be configured to refuse to authenticate using a password
+# and StrictHostKeyChecking is disabled
+
+Host *
     IdentityFile ~/.ssh/school
     PasswordAuthentication no
+    StrictHostKeyChecking no
