@@ -1,4 +1,4 @@
-!/usr/bin/env bash
+#!/usr/bin/env bash
 # This script installs and configures the Nginx web server on an Ubuntu machine.
 # It ensures the server is running, listening on port 80, and serves
 # a page containing "Holberton School" at the root path.
