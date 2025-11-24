@@ -1,0 +1,54 @@
+#!/usr/bin/env bash
+# This script installs Nginx, configures a 301 redirection, and sets up
+# a custom 404 error page containing the string "Ceci n'est pas une page".
+
+# Define variables
+REDIRECT_URL="https://www.youtube.com/watch?v=QH2-TGUlwu4"
+NGINX_CONF_FILE="/etc/nginx/sites-available/default"
+ROOT_CONTENT="Holberton School for the win!"
+ERROR_CONTENT="Ceci n'est pas une page"
+ERROR_FILE="/var/www/html/404.html"
+INDEX_FILE="/var/www/html/index.html"
+
+# --- 1. Update and Install Nginx ---
+
+echo "Updating package lists and installing Nginx..."
+sudo apt-get update -y
+sudo apt-get install nginx -y
+
+# --- 2. Configure Custom Pages ---
+
+# Create custom index page (from previous requirements)
+echo "Creating custom index page: $INDEX_FILE"
+echo "$ROOT_CONTENT" | sudo tee "$INDEX_FILE" > /dev/null
+
+# Create custom 404 error page with the required string
+echo "Creating custom 404 error page: $ERROR_FILE"
+echo "$ERROR_CONTENT" | sudo tee "$ERROR_FILE" > /dev/null
+
+# --- 3. Configure Nginx Redirection and 404 Page using sed ---
+
+echo "Configuring 301 redirection and custom 404 page in Nginx..."
+
+# 3a. Add 301 Redirection (from 3-redirection)
+# Replaces 'server_name _;' with the redirect block
+sudo sed -i '/server_name _;/ c\
+        server_name _;\
+\
+        location /redirect_me {\
+                return 301 '"$REDIRECT_URL"';\
+        }' "$NGINX_CONF_FILE"
+
+# 3b. Configure Custom 404 Page
+# Insert the error_page directive inside the server block, before the main location / block.
+# The 'i' command inserts content before the matched pattern 'location / {'.
+sudo sed -i '/location \/ {/i \ \n\terror_page 404 \/404.html;' "$NGINX_CONF_FILE"
+
+
+# --- 4. Restart Nginx (without systemctl) ---
+
+echo "Restarting Nginx service to apply changes..."
+# The 'service' command is used as required instead of systemctl.
+sudo service nginx restart
+
+echo "Nginx configuration complete. Test the 404 page with a nonexistent path."

@@ -1,0 +1,37 @@
+!/usr/bin/env bash
+# This script installs and configures the Nginx web server on an Ubuntu machine.
+# It ensures the server is running, listening on port 80, and serves
+# a page containing "Holberton School" at the root path.
+
+# Define the required custom content string
+CUSTOM_CONTENT="Holberton School for the win!"
+
+# --- 1. Update and Install Nginx ---
+
+# Update the package lists non-interactively (-y)
+echo "Updating package lists..."
+sudo apt-get update -y
+
+# Install Nginx non-interactively (-y)
+echo "Installing Nginx..."
+sudo apt-get install nginx -y
+
+# --- 2. Configure Custom Index Page ---
+
+# Nginx's default web root on Ubuntu is /var/www/html/
+INDEX_FILE="/var/www/html/index.html"
+
+# Write the custom content to the default index file.
+# We use 'sudo tee' to write to a file owned by root, and > /dev/null 
+# to suppress the output of tee itself.
+echo "Creating custom index page: $INDEX_FILE"
+echo "$CUSTOM_CONTENT" | sudo tee "$INDEX_FILE" > /dev/null
+
+# --- 3. Restart Nginx (without systemctl) ---
+
+# Restart Nginx to load the new configuration/content.
+# The 'service' command is used as an alternative to systemctl.
+echo "Restarting Nginx service..."
+sudo service nginx restart
+
+echo "Nginx setup complete. Check the status and content locally with 'curl 127.0.0.1'."
