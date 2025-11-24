@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 # This script installs Nginx and configures a permanent (301) redirection
-# from /redirect_me to a target URL, using 'sed' to replace a line with multiple lines.
+# from /redirect_me to a target URL.
+# This version uses a single-line sed command with escaped newlines (\n) to avoid
+# SC1004 shell check warnings, while fulfilling the requirement to replace a line
+# with multiple lines.
 
 # Define the target redirection URL
 REDIRECT_URL="https://www.youtube.com/watch?v=QH2-TGUlwu4"
@@ -23,28 +26,23 @@ echo "$CUSTOM_CONTENT" | sudo tee "$INDEX_FILE" > /dev/null
 
 echo "Configuring 301 redirection in Nginx..."
 
-# The sed 'c' command is used here to *change* (replace) the matched line 
-# (server_name _;) with multiple lines: the original line itself, a blank line, 
-# and the entire 'location' block for the 301 redirect.
-# The backslashes are used to continue the 'c' command across multiple lines.
-# This fulfills the requirement to "Replace a line with multiple lines with sed".
+# Escape the REDIRECT_URL to be safe inside the sed command
+# This replaces all forward slashes (/) with escaped forward slashes (\/)
+REDIRECT_URL_ESCAPED="${REDIRECT_URL//\//\\/}"
 
-sudo sed -i '/server_name _;/ c\
-        server_name _;\
-\
-        location /redirect_me {\
-                return 301 '"$REDIRECT_URL"';\
-        }' "$NGINX_CONF_FILE"
+# Define the entire block that will replace the 'server_name _;' line.
+# We use '\\n' for newlines and '\\t' for tabs (for indentation), all within a single quote block.
+# The 'c' command replaces the matched line with the content of this string.
+INSERT_BLOCK="server_name _;\\n\\n\tlocation /redirect_me {\\n\t\treturn 301 ${REDIRECT_URL_ESCAPED};\\n\t}"
 
-# The command above targets the `server_name _;` line and replaces it with:
-# 1. server_name _;
-# 2. (Empty line)
-# 3. location /redirect_me { ... } (The redirect block)
+# Apply the change
+# /pattern/c content: Change (replace) the matched line with the content.
+sudo sed -i "/server_name _;/c ${INSERT_BLOCK}" "$NGINX_CONF_FILE"
 
 # --- 4. Restart Nginx (without systemctl) ---
 
 echo "Restarting Nginx service to apply changes..."
-# The 'service' command is used as required instead of systemctl.
+# The 'service' command is used as an alternative to systemctl.
 sudo service nginx restart
 
 echo "Nginx configuration complete. Redirection from /redirect_me to $REDIRECT_URL is set."
