@@ -1,127 +1,30 @@
 #!/usr/bin/env bash
-#
-# This script installs and configures HAproxy on a new Ubuntu machine (lb-01)
-# to act as a load balancer for two backend web servers (web-01 and web-02).
-#
-# Requirements:
-# 1. Distributes requests using the roundrobin algorithm.
-# 2. Configures a frontend listening on port 80.
-# 3. Uses IP addresses for backend servers for reliable configuration.
-#
-# Updated with provided server details:
-# - 6615-web-01: 18.205.161.238
-# - 6615-web-02: 52.90.56.75
+#Bash script that installs HAProxy & makes configurations
 
-set -e
 
-# Define variables with specific IP addresses for the backend web servers
-HAPROXY_CONFIG="/etc/haproxy/haproxy.cfg"
-WEB_01_IP="18.205.161.238" # IP address for 6615-web-01
-WEB_02_IP="52.90.56.75"   # IP address for 6615-web-02
 
-echo "--- Starting HAproxy Installation and Configuration ---"
+apt-get -y install software-properties-common
 
-# --- 1. Installation ---
-echo "Updating package list..."
-sudo apt-get update -y > /dev/null
+add-apt-repository ppa:vbernat/haproxy-1.8
 
-echo "Installing HAproxy..."
-sudo apt-get install -y haproxy > /dev/null
+apt-get update
 
-if ! command -v haproxy &> /dev/null; then
-    echo "ERROR: HAproxy failed to install. Exiting."
-    exit 1
-fi
-echo "HAproxy installed successfully."
+apt-get -y install haproxy
 
-# --- 2. Configuration ---
+echo "ENABLED=1" >> /etc/default/haproxy
 
-echo "Backing up original HAproxy configuration file..."
-sudo cp "$HAPROXY_CONFIG" "${HAPROXY_CONFIG}.bak"
+printf %s "listen 5819-webs
 
-echo "Creating new HAproxy configuration..."
-
-# FIX: Use 'sudo tee' to write the content of the heredoc to the config file
-# This ensures the shell redirection is executed with root privileges.
-# The output of tee is discarded using > /dev/null.
-sudo tee "$HAPROXY_CONFIG" > /dev/null << EOF
-# Global settings
-global
-    log /dev/log    local0
-    log /dev/log    local1 notice
-    chroot /var/lib/haproxy
-    stats socket /run/haproxy/admin.sock mode 660 level admin expose-fd listeners
-    stats timeout 30s
-    user haproxy
-    group haproxy
-    daemon
-
-    # Default ciphers to use on SSL-enabled listening sockets.
-    # We use a sane default configuration here.
-    ssl-default-bind-ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384
-    ssl-default-bind-options ssl-min-ver TLSv1.2
-
-defaults
-    log global
-    mode http
-    option httplog
-    option dontlognull
-    timeout connect 5000
-    timeout client  50000
-    timeout server  50000
-    errorfile 400 /etc/haproxy/errors/400.http
-    errorfile 403 /etc/haproxy/errors/403.http
-    errorfile 408 /etc/haproxy/errors/408.http
-    errorfile 500 /etc/haproxy/errors/500.http
-    errorfile 502 /etc/haproxy/errors/502.http
-    errorfile 503 /etc/haproxy/errors/503.http
-    errorfile 504 /etc/haproxy/errors/504.http
-
-# Frontend configuration - Listens for incoming HTTP traffic on port 80
-frontend http_front
     bind *:80
-    default_backend http_backend
 
-# Backend configuration - Defines the servers and load balancing algorithm
-backend http_backend
-    # Use roundrobin algorithm to distribute requests sequentially
+    mode http
+
     balance roundrobin
-    # Define the backend servers using the provided IP addresses. Port 80 is the default Nginx port.
-    server web01 $WEB_01_IP:80 check
-    server web02 $WEB_02_IP:80 check
-EOF
 
-# --- 3. Enable HAproxy Service (Required for init script management) ---
+    server 6848-web-01 18.205.161.238 check
 
-# HAproxy's init script relies on a setting in /etc/default/haproxy
-# We need to ensure 'ENABLED=1' is set so the service starts on boot and can be managed.
-DEFAULT_CONFIG="/etc/default/haproxy"
+    server 6848-web-02 52.90.56.75 check
 
-echo "Ensuring HAproxy is enabled for init script management..."
+" >> /etc/haproxy/haproxy.cfg
 
-# Check if the line 'ENABLED=1' is present, if not, update it.
-if sudo grep -q "ENABLED=1" "$DEFAULT_CONFIG"; then
-    echo "HAproxy already enabled."
-else
-    # Replace ENABLED=0 with ENABLED=1
-    sudo sed -i 's/^ENABLED=0/ENABLED=1/' "$DEFAULT_CONFIG"
-    if ! sudo grep -q "ENABLED=1" "$DEFAULT_CONFIG"; then
-        # Fallback if ENABLED=0 doesn't exist, append it
-        echo "ENABLED=1" | sudo tee -a "$DEFAULT_CONFIG" > /dev/null
-    fi
-fi
-
-# --- 4. Validate and Restart Service ---
-
-echo "Validating HAproxy configuration..."
-# Use 'haproxy -c' to check configuration file syntax
-if sudo haproxy -c -f "$HAPROXY_CONFIG" &> /dev/null; then
-    echo "Configuration test passed. Restarting HAproxy service..."
-    # The requirement is to be managed via an init script, so we use 'service'
-    sudo service haproxy restart
-    echo "HAproxy service restarted successfully."
-    echo "--- HAproxy Configuration Complete ---"
-else
-    echo "ERROR: HAproxy configuration test failed. Review changes to $HAPROXY_CONFIG."
-    exit 1
-fi
+sudo service haproxy restart
