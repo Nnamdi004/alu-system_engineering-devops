@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+# This script connects to a server (using 18.205.161.238 as a placeholder)
+# with the user 'ubuntu' and uses the private key stored at ~/.ssh/school.
+# It uses only the single-character -i flag as required.
+
+# Syntax: ssh -i <identity_file> <user>@<host>
+ssh -i ~/.ssh/school ubuntu@18.205.161.238

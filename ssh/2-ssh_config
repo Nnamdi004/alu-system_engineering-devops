@@ -1,0 +1,15 @@
+SSH Client Configuration for key-based authentication
+
+The 'Host *' block applies the following settings to all hosts
+
+unless they are overridden by a more specific Host entry.
+
+Host *
+# Specify the path to the private key file.
+# This fulfills the requirement to use the ~/.ssh/school key.
+IdentityFile ~/.ssh/school
+
+# Explicitly refuse password authentication.
+# This fulfills the requirement to refuse authentication using a password.
+PasswordAuthentication no
+
