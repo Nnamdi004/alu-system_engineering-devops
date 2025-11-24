@@ -1,0 +1,65 @@
+#!/usr/bin/env bash
+#
+# This script configures the Uncomplicated Firewall (ufw) on an Ubuntu machine
+# to block all incoming traffic by default, while explicitly allowing access
+# to required ports (SSH, HTTP, and HTTPS).
+#
+# Requirements applied to web-01:
+# - Install ufw if not present.
+# - Set default policy to deny incoming traffic.
+# - Allow incoming traffic on TCP ports 22, 80, and 443.
+# - Enable the firewall.
+
+set -e
+
+echo "--- Starting UFW Firewall Configuration ---"
+
+# --- 1. Installation (Ensuring ufw is present) ---
+if ! command -v ufw &> /dev/null; then
+    echo "UFW not found. Installing ufw..."
+    sudo apt-get update -y > /dev/null
+    sudo apt-get install ufw -y > /dev/null
+    echo "UFW installed."
+else
+    echo "UFW is already installed."
+fi
+
+# --- 2. Reset and Set Default Policy ---
+
+echo "Resetting UFW rules to ensure a clean state..."
+# Non-interactive reset (y to confirm)
+echo "y" | sudo ufw reset
+
+echo "Setting default incoming policy to DENY (block all incoming traffic)..."
+# Set default policy for incoming traffic to deny
+sudo ufw default deny incoming
+
+echo "Setting default outgoing policy to ALLOW (allow all outgoing traffic)..."
+# Set default policy for outgoing traffic to allow (necessary for updates/reaching backends)
+sudo ufw default allow outgoing
+
+
+# --- 3. Allow Required Ports (TCP) ---
+
+echo "Allowing incoming traffic on TCP port 22 (SSH)..."
+# Allow SSH access
+sudo ufw allow 22/tcp
+
+echo "Allowing incoming traffic on TCP port 80 (HTTP)..."
+# Allow HTTP access
+sudo ufw allow 80/tcp
+
+echo "Allowing incoming traffic on TCP port 443 (HTTPS/SSL)..."
+# Allow HTTPS/SSL access
+sudo ufw allow 443/tcp
+
+# --- 4. Enable UFW ---
+
+echo "Enabling UFW firewall..."
+# Enable the firewall and confirm non-interactively
+echo "y" | sudo ufw enable
+
+# --- 5. Display Status ---
+echo "--- UFW Configuration Complete ---"
+echo "Current UFW status:"
+sudo ufw status verbose
