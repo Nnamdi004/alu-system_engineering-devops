@@ -1,4 +1,6 @@
-s script installs and configures HAproxy on a new Ubuntu machine (lb-01)
+#!/usr/bin/env bash
+#
+# This script installs and configures HAproxy on a new Ubuntu machine (lb-01)
 # to act as a load balancer for two backend web servers (web-01 and web-02).
 #
 # Requirements:
