@@ -1,70 +1,24 @@
 #!/usr/bin/env bash
-#
-# This script configures a brand new Ubuntu machine to install Nginx
-# and modify its default server block to include a custom HTTP response header
-# named 'X-Served-By' with the value set to the server's hostname.
-#
-# Note: This script is designed to be idempotent and handles potential
-# duplication of the custom header directive.
+# Configures Nginx with a custom HTTP response header
+# The custom header is X-Served-By with the value set to the server's hostname
 
-# Exit immediately if a command exits with a non-zero status.
-set -e
+# Update package list and install Nginx if not already installed
+apt-get update -y
+apt-get install -y nginx
 
-# --- 1. Install Nginx ---
-echo "--- Starting Nginx Installation and Configuration ---"
-echo "Updating package list..."
-# Suppress output of update to keep the console clean
-sudo apt-get update -y > /dev/null
+# Get the hostname of the server
+HOSTNAME=$(hostname)
 
-echo "Installing Nginx..."
-# Suppress output of install to keep the console clean
-sudo apt-get install -y nginx > /dev/null
+# Configure Nginx to add custom header
+# We'll add the header configuration to the http block in nginx.conf
+HEADER_CONFIG="add_header X-Served-By $HOSTNAME;"
 
-# Verify Nginx installation
-if ! command -v nginx &> /dev/null; then
-    echo "ERROR: Nginx failed to install. Exiting."
-    exit 1
-fi
-echo "Nginx installed successfully."
-
-# --- 2. Configure Nginx with Custom Header ---
-CONFIG_FILE="/etc/nginx/sites-available/default"
-# The '\$' is escaped so that it is written literally into the config file.
-# Nginx will interpret '$hostname' at runtime, resolving to the server's unique hostname.
-# Indentation added for clean config file output.
-HEADER_DIRECTIVE="    add_header X-Served-By \$hostname;"
-
-echo "Configuring Nginx default server block in $CONFIG_FILE..."
-
-# A. Remove any existing X-Served-By headers to prevent duplication (idempotency)
-if sudo grep -q "X-Served-By" "$CONFIG_FILE"; then
-    echo "Existing 'X-Served-By' header found. Removing old directives..."
-    # 'd' command deletes the line that matches the pattern
-    # We use '|' as the sed delimiter here to avoid escaping '/'
-    sudo sed -i '/add_header X-Served-By/d' "$CONFIG_FILE"
+# Check if the custom header already exists in the config
+if ! grep -q "X-Served-By" /etc/nginx/nginx.conf; then
+    # Add the custom header to the http block
+    sed -i "/http {/a \\\t$HEADER_CONFIG" /etc/nginx/nginx.conf
 fi
 
-# B. Insert the new, desired header directive after the 'listen 80 default_server;' line
-# The Nginx $hostname variable automatically resolves to the server's current hostname.
-echo "Injecting header: X-Served-By \$hostname..."
-# Using 'a\' for append and making the insertion clean and indented
-sudo sed -i "/listen 80 default_server;/a$HEADER_DIRECTIVE" "$CONFIG_FILE"
-    
-echo "Successfully injected header into $CONFIG_FILE."
-
-
-# --- 3. Validate Configuration and Restart Nginx ---
-
-echo "Checking Nginx configuration syntax..."
-if sudo nginx -t &> /dev/null; then
-    echo "Configuration test passed. Restarting Nginx service..."
-    # Use systemctl/service for robust restart across Ubuntu versions
-    sudo service nginx restart
-    echo "Nginx restarted. Custom header should now be active."
-    echo "--- Configuration Complete ---"
-else
-    echo "ERROR: Nginx configuration test failed. Review changes to $CONFIG_FILE."
-    # Display the configuration test error for debugging
-    sudo nginx -t
-    exit 1
-fi
+# Ensure Nginx is enabled and restart it to apply changes
+systemctl enable nginx
+systemctl restart nginx
