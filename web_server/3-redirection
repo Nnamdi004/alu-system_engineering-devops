@@ -8,7 +8,7 @@ apt-get install -y nginx
 # Create a simple index page
 echo "Hello World!" > /var/www/html/index.html
 
-# Create a clean Nginx configuration with redirect
+# Create Nginx configuration with redirect
 cat > /etc/nginx/sites-available/default <<'EOF'
 server {
     listen 80 default_server;
@@ -19,34 +19,30 @@ server {
 
     server_name _;
 
-    location = /redirect_me {
-        return 301 https://www.youtube.com/watch?v=QH2-TGUlwu4;
-    }
-
-    location /redirect_me/ {
+    location /redirect_me {
         return 301 https://www.youtube.com/watch?v=QH2-TGUlwu4;
     }
 
     location / {
         try_files $uri $uri/ =404;
     }
-
-    error_page 404 /404.html;
 }
 EOF
 
-# Ensure the symlink exists
-ln -sf /etc/nginx/sites-available/default /etc/nginx/sites-enabled/default
+# Ensure the sites-enabled directory exists
+mkdir -p /etc/nginx/sites-enabled
 
-# Remove default index.nginx-debian.html if it exists
-rm -f /var/www/html/index.nginx-debian.html
+# Remove any existing default symlink
+rm -f /etc/nginx/sites-enabled/default
+
+# Create symlink
+ln -s /etc/nginx/sites-available/default /etc/nginx/sites-enabled/default
 
 # Test Nginx configuration
-if nginx -t; then
-    # Enable and restart Nginx
-    systemctl enable nginx
-    systemctl restart nginx
-else
-    echo "Nginx configuration test failed!"
-    exit 1
-fi
+nginx -t
+
+# Start Nginx service
+service nginx start
+
+# Restart to apply changes
+service nginx restart
