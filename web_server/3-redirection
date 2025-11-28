@@ -1,48 +1,52 @@
 #!/usr/bin/env bash
-# This script installs Nginx and configures a permanent (301) redirection
-# from /redirect_me to a target URL.
-# This version uses a single-line sed command with escaped newlines (\n) to avoid
-# SC1004 shell check warnings, while fulfilling the requirement to replace a line
-# with multiple lines.
+# Configures Nginx server to redirect /redirect_me to another page with 301
 
-# Define the target redirection URL
-REDIRECT_URL="https://www.youtube.com/watch?v=QH2-TGUlwu4"
-NGINX_CONF_FILE="/etc/nginx/sites-available/default"
-CUSTOM_CONTENT="Holberton School for the win!"
+# Update package list and install Nginx
+apt-get update -y
+apt-get install -y nginx
 
-# --- 1. Update and Install Nginx ---
+# Create a simple index page
+echo "Hello World!" > /var/www/html/index.html
 
-echo "Updating package lists and installing Nginx..."
-sudo apt-get update -y
-sudo apt-get install nginx -y
+# Create a clean Nginx configuration with redirect
+cat > /etc/nginx/sites-available/default <<'EOF'
+server {
+    listen 80 default_server;
+    listen [::]:80 default_server;
 
-# --- 2. Configure Custom Index Page (from 1-install_nginx_web_server) ---
+    root /var/www/html;
+    index index.html index.htm index.nginx-debian.html;
 
-INDEX_FILE="/var/www/html/index.html"
-echo "Creating custom index page..."
-echo "$CUSTOM_CONTENT" | sudo tee "$INDEX_FILE" > /dev/null
+    server_name _;
 
-# --- 3. Add 301 Redirection using sed ---
+    location = /redirect_me {
+        return 301 https://www.youtube.com/watch?v=QH2-TGUlwu4;
+    }
 
-echo "Configuring 301 redirection in Nginx..."
+    location /redirect_me/ {
+        return 301 https://www.youtube.com/watch?v=QH2-TGUlwu4;
+    }
 
-# Escape the REDIRECT_URL to be safe inside the sed command
-# This replaces all forward slashes (/) with escaped forward slashes (\/)
-REDIRECT_URL_ESCAPED="${REDIRECT_URL//\//\\/}"
+    location / {
+        try_files $uri $uri/ =404;
+    }
 
-# Define the entire block that will replace the 'server_name _;' line.
-# We use '\\n' for newlines and '\\t' for tabs (for indentation), all within a single quote block.
-# The 'c' command replaces the matched line with the content of this string.
-INSERT_BLOCK="server_name _;\\n\\n\tlocation /redirect_me {\\n\t\treturn 301 ${REDIRECT_URL_ESCAPED};\\n\t}"
+    error_page 404 /404.html;
+}
+EOF
 
-# Apply the change
-# /pattern/c content: Change (replace) the matched line with the content.
-sudo sed -i "/server_name _;/c ${INSERT_BLOCK}" "$NGINX_CONF_FILE"
+# Ensure the symlink exists
+ln -sf /etc/nginx/sites-available/default /etc/nginx/sites-enabled/default
 
-# --- 4. Restart Nginx (without systemctl) ---
+# Remove default index.nginx-debian.html if it exists
+rm -f /var/www/html/index.nginx-debian.html
 
-echo "Restarting Nginx service to apply changes..."
-# The 'service' command is used as an alternative to systemctl.
-sudo service nginx restart
-
-echo "Nginx configuration complete. Redirection from /redirect_me to $REDIRECT_URL is set."
+# Test Nginx configuration
+if nginx -t; then
+    # Enable and restart Nginx
+    systemctl enable nginx
+    systemctl restart nginx
+else
+    echo "Nginx configuration test failed!"
+    exit 1
+fi

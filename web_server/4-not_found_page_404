@@ -1,62 +1,58 @@
 #!/usr/bin/env bash
-# This script installs Nginx, configures a 301 redirection, and sets up
-# a custom 404 error page containing the string "Ceci n'est pas une page".
+# Configures Nginx server with a custom 404 page
 
-# Define variables
-REDIRECT_URL="https://www.youtube.com/watch?v=QH2-TGUlwu4"
-NGINX_CONF_FILE="/etc/nginx/sites-available/default"
-ROOT_CONTENT="Holberton School for the win!"
-ERROR_CONTENT="Ceci n'est pas une page"
-ERROR_FILE="/var/www/html/404.html"
-INDEX_FILE="/var/www/html/index.html"
+# Update package list and install Nginx
+apt-get update -y
+apt-get install -y nginx
 
-# --- 1. Update and Install Nginx ---
+# Create a simple index page
+echo "Hello World!" > /var/www/html/index.html
 
-echo "Updating package lists and installing Nginx..."
-sudo apt-get update -y
-sudo apt-get install nginx -y
+# Create custom 404 page
+echo "Ceci n'est pas une page" > /var/www/html/404.html
 
-# Exit if installation fails
-if [ $? -ne 0 ]; then
-    echo "ERROR: Nginx installation failed. Exiting."
+# Create Nginx configuration with custom 404 page
+cat > /etc/nginx/sites-available/default <<'EOF'
+server {
+    listen 80 default_server;
+    listen [::]:80 default_server;
+
+    root /var/www/html;
+    index index.html index.htm index.nginx-debian.html;
+
+    server_name _;
+
+    location = /redirect_me {
+        return 301 https://www.youtube.com/watch?v=QH2-TGUlwu4;
+    }
+
+    location /redirect_me/ {
+        return 301 https://www.youtube.com/watch?v=QH2-TGUlwu4;
+    }
+
+    location / {
+        try_files $uri $uri/ =404;
+    }
+
+    error_page 404 /404.html;
+    location = /404.html {
+        internal;
+    }
+}
+EOF
+
+# Ensure the symlink exists
+ln -sf /etc/nginx/sites-available/default /etc/nginx/sites-enabled/default
+
+# Remove default index.nginx-debian.html if it exists
+rm -f /var/www/html/index.nginx-debian.html
+
+# Test Nginx configuration
+if nginx -t; then
+    # Enable and restart Nginx
+    systemctl enable nginx
+    systemctl restart nginx
+else
+    echo "Nginx configuration test failed!"
     exit 1
 fi
-
-# --- 2. Configure Custom Pages ---
-
-# Create custom index page (for root /)
-echo "Creating custom index page: $INDEX_FILE"
-echo "$ROOT_CONTENT" | sudo tee "$INDEX_FILE" > /dev/null
-
-# Create custom 404 error page
-echo "Creating custom 404 error page: $ERROR_FILE"
-echo "$ERROR_CONTENT" | sudo tee "$ERROR_FILE" > /dev/null
-
-# --- 3. Configure Nginx Redirection and 404 Page using sed ---
-
-echo "Configuring 301 redirection and custom 404 page in Nginx..."
-
-# Combine both configuration changes into one safe insertion after 'server_name _;'.
-# This prevents the location block from being placed outside the server block, fixing the previous error.
-# The 'a' command appends the entire escaped block after the matched line.
-# We define the entire block to insert, ensuring newlines (\n) and tabs (\t) are escaped.
-# The REDIRECT_URL is also escaped for sed using ${REDIRECT_URL//\//\\/}.
-INSERT_BLOCK="\n\terror_page 404 /404.html;\n\n\tlocation /redirect_me {\n\t\treturn 301 ${REDIRECT_URL//\//\\/};\n\t}"
-sudo sed -i "/server_name _;/a ${INSERT_BLOCK}" "$NGINX_CONF_FILE"
-
-# --- 4. Test Configuration and Restart Nginx (without systemctl) ---
-
-echo "Testing Nginx configuration for syntax errors..."
-# Test config to catch errors before restart (best practice)
-sudo nginx -t
-
-if [ $? -ne 0 ]; then
-    echo "ERROR: Nginx configuration test failed. Check the default config file for syntax issues."
-    exit 1
-fi
-
-echo "Restarting Nginx service to apply changes..."
-# The 'service' command is used as required instead of systemctl.
-sudo service nginx restart
-
-echo "Nginx configuration complete. Test root content, redirection, and 404 page."
