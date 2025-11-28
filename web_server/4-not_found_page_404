@@ -9,9 +9,7 @@ apt-get install -y nginx
 echo "Hello World!" > /var/www/html/index.html
 
 # Create custom 404 page with exact string
-cat > /var/www/html/404.html <<'EOF'
-Ceci n'est pas une page
-EOF
+echo "Ceci n'est pas une page" > /var/www/html/404.html
 
 # Create Nginx configuration with custom 404 page
 cat > /etc/nginx/sites-available/default <<'EOF'
@@ -24,37 +22,31 @@ server {
 
     server_name _;
 
-    location = /redirect_me {
-        return 301 https://www.youtube.com/watch?v=QH2-TGUlwu4;
-    }
-
-    location /redirect_me/ {
-        return 301 https://www.youtube.com/watch?v=QH2-TGUlwu4;
+    error_page 404 /404.html;
+    location = /404.html {
+        internal;
     }
 
     location / {
         try_files $uri $uri/ =404;
     }
-
-    error_page 404 /404.html;
-    location = /404.html {
-        internal;
-    }
 }
 EOF
 
-# Ensure the symlink exists
-ln -sf /etc/nginx/sites-available/default /etc/nginx/sites-enabled/default
+# Ensure the sites-enabled directory exists
+mkdir -p /etc/nginx/sites-enabled
 
-# Remove default index.nginx-debian.html if it exists
-rm -f /var/www/html/index.nginx-debian.html
+# Remove any existing default symlink
+rm -f /etc/nginx/sites-enabled/default
+
+# Create symlink
+ln -s /etc/nginx/sites-available/default /etc/nginx/sites-enabled/default
 
 # Test Nginx configuration
-if nginx -t; then
-    # Enable and restart Nginx
-    systemctl enable nginx
-    systemctl restart nginx
-else
-    echo "Nginx configuration test failed!"
-    exit 1
-fi
+nginx -t
+
+# Start Nginx service
+service nginx start
+
+# Restart to apply changes
+service nginx restart
